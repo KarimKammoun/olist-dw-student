@@ -1,0 +1,31 @@
+# Credentials come from environment variables, never from this file.
+#   Windows (PowerShell):  $env:DBT_USER="olist_dbt_login"; $env:DBT_PASSWORD="..."
+olist:
+  target: dev
+  outputs:
+    # dbt run from Windows (venv) -> SQL Server on the same machine
+    dev:
+      type: sqlserver
+      driver: "ODBC Driver 18 for SQL Server"
+      server: "{{ env_var('MSSQL_SERVER', 'localhost') }}"
+      port: "{{ env_var('MSSQL_PORT', '1433') | as_number }}"
+      database: OlistDW
+      schema: staging
+      user: "{{ env_var('DBT_USER', 'olist_dbt_login') }}"
+      password: "{{ env_var('DBT_PASSWORD') }}"
+      encrypt: true
+      trust_cert: true
+      threads: 4
+    # dbt run by Cosmos inside the Astro containers (TP 7)
+    docker:
+      type: sqlserver
+      driver: "ODBC Driver 18 for SQL Server"
+      server: host.docker.internal
+      port: "{{ env_var('MSSQL_PORT', '1433') | as_number }}"
+      database: OlistDW
+      schema: staging
+      user: "{{ env_var('DBT_USER', 'olist_dbt_login') }}"
+      password: "{{ env_var('DBT_PASSWORD') }}"
+      encrypt: true
+      trust_cert: true
+      threads: 4

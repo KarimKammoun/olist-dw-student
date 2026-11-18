@@ -1,0 +1,61 @@
+version: 2
+
+sources:
+  - name: olist
+    description: >
+      Raw tables in OlistDW.raw, loaded as text by the Airflow DAG olist_dw_pipeline
+      (replaced on each run, login olist_ingest_login). Files land AS THEY ARE: CSV and Parquet
+      as text columns, JSON and JSONL as one JSON document per row (column record). Every table
+      also has _source_file and _loaded_at. Flattening, typing and deduplication happen in staging.
+    database: OlistDW
+    schema: raw
+    tables:
+      - name: orders
+        description: >
+          From JSONL. 99,441 rows, one per order. Columns: record (the whole order as a JSON
+          document), _source_file, _loaded_at. Flattened in stg_orders.
+        columns:
+          - name: record
+            data_tests: [not_null]
+      - name: order_items
+        description: >
+          From Parquet. 112,650 rows. order_item_id was int64, price/freight double,
+          shipping_limit_date a timestamp (some fall in 2020: a source quirk).
+      - name: payments
+        description: >
+          From JSON (array). 103,886 rows, one JSON document per payment in column record.
+          payment_value is a JSON number: staging converts it to DECIMAL(12,2).
+        columns:
+          - name: record
+            data_tests: [not_null]
+      - name: reviews
+        description: >
+          From JSON (array). 99,224 rows, one JSON document per review in column record.
+          review_id repeats 814 times; 551 orders have more than one review.
+          Comments contain accents and line breaks.
+        columns:
+          - name: record
+            data_tests: [not_null]
+      - name: customers
+        description: >
+          From Parquet. 99,441 rows. customer_zip_code_prefix was int64, so about 24% of zips
+          lost their leading zero (01037 -> 1037): staging pads them back.
+        columns:
+          - name: customer_id
+            data_tests: [not_null, unique]
+      - name: products
+        description: "From CSV. 32,951 rows, all text. 610 empty categories (''). Kaggle typos product_name_lenght / product_description_lenght."
+        columns:
+          - name: product_id
+            data_tests: [not_null, unique]
+      - name: sellers
+        description: "From CSV. 3,095 rows. Zips keep their leading zeros."
+        columns:
+          - name: seller_id
+            data_tests: [not_null, unique]
+      - name: geolocation
+        description: >
+          From Parquet. 1,000,163 rows including 261,831 exact duplicates; many rows per zip
+          prefix (19,015 distinct). Zip was int64, so leading zeros are lost.
+      - name: category_translation
+        description: "From CSV with a UTF-8 BOM. 71 rows; 2 categories have no translation."

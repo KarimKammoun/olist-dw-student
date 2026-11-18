@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: One row per order, flattened from the JSON document and typed. Reference model.
+    columns:
+      - name: order_id
+        data_tests: [not_null, unique]
+      - name: purchased_at
+        data_tests: [not_null]
+# TODO TP3: add your staging models and their tests here

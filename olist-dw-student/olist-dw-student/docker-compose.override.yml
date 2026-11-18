@@ -1,0 +1,8 @@
+# SQL Server runs on the Windows host, NOT in Docker.
+# Containers reach it at host.docker.internal (built in on Docker Desktop for Windows/macOS).
+services:
+  scheduler:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # needed on Linux only, harmless elsewhere
+    ports:
+      - "8081:8081"                            # optional: dbt docs served from the container
