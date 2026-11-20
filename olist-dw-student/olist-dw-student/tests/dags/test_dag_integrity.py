@@ -12,7 +12,7 @@ def test_no_import_errors():
 
 def test_nine_loading_dags():
     bag = DagBag(dag_folder="dags", include_examples=False)
-    for table in ["orders"]:   # TODO TP2: test all nine tables once your DAGs exist
+    for table in TABLES:
         dag = bag.get_dag(f"load_raw_{table}")
         assert dag is not None, f"missing DAG load_raw_{table}"
         assert [t.task_id for t in dag.topological_sort()] == ["find", "create_table", "truncate_table", "load_to_raw", "check_rows"]

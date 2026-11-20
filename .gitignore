@@ -1,0 +1,8 @@
+# Fichiers sensibles / locaux
+.env
+**/__pycache__/
+**/*.py[cod]
+
+# La copie des données Olist dans le projet Astro est un doublon LOCAL
+# (la source de vérité est <racine>/include/data/olist/, versionnée sur main).
+/olist-dw-student/olist-dw-student/include/data/olist/
