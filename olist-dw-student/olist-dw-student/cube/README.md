@@ -212,11 +212,14 @@ Onglet **Calculations** → onglet *Script view* (icône `{}`) → remplacer tou
 | Item Count 2016 / 2017 / 2018 | 370 / 50 864 / 61 416 |
 | Payment Value | 16 008 872,12 |
 | Late Rate (commandes livrées) | 6,77 % (6 534 sur 96 478) |
+| Orders Count (`fact_orders`) | 99 441 |
+| Order Count sur `fact_sales` (distinct `order_id`) | 98 666 (775 commandes n'ont aucune ligne) |
+| Installments (`SUM(payment_installments)`) | 296 423 (le 104 634 du document de cours ne correspond pas à la somme de la colonne) |
 
 Requêtes : `mdx/business_questions.mdx` (SSAS). Contrôle SQL équivalent :
 `include/sql/06_validate_warehouse_totals.sql` (moteur de base de données).
 
-## 10. Deux pièges qui changent les chiffres
+## 10. Trois pièges qui changent les chiffres
 
 1. **Le Late Rate se calcule sur les commandes livrées seulement.**
    `Late Orders / Orders Count` sur *toutes* les commandes donne 0,79 % ; la référence
@@ -225,6 +228,12 @@ Requêtes : `mdx/business_questions.mdx` (SSAS). Contrôle SQL équivalent :
 2. **`is_late` compare des dates, pas des horodatages.** `fact_orders` le calcule au jour ;
    sur les timestamps on obtient 7 826 (8,11 %) parce que la date estimée est stockée à
    00:00:00.
+3. **Deux chiffres du document de cours ne correspondent pas aux fichiers sources**, et le DW
+   donne raison aux fichiers : `COUNT(DISTINCT order_id)` sur `fact_sales` vaut **98 666**
+   (les 775 commandes annulées/indisponibles avant tout article n'ont aucune ligne — le
+   99 441 est le nombre de *commandes*, à lire sur `fact_orders`), et
+   `SUM(payment_installments)` vaut **296 423** (103 886 paiements, maximum 24 fois).
+   Le script `06_validate_warehouse_totals.sql` contient les deux contrôles (§8).
 
 ## 11. Fichiers de ce dossier
 

@@ -177,6 +177,12 @@ dbt build --profiles-dir .
 * **`dim_date` also exposes `quarter_key` (YYYYQ) and `month_key` (YYYYMM)**: the raw `quarter`
   and `month` numbers repeat every year, so they cannot key a Date hierarchy in SSAS
   (all four Januaries would collapse into one member).
+* **Two reference numbers of the course document do not match the source files**, and the
+  warehouse follows the files: `COUNT(DISTINCT order_id)` on `fact_sales` is **98,666**
+  (775 canceled / unavailable orders have no order line; 99,441 is the number of *orders*,
+  i.e. `fact_orders`), and `SUM(payment_installments)` is **296,423** (103,886 payments,
+  max 24 instalments), not 104,634. Section 8 of `06_validate_warehouse_totals.sql`
+  demonstrates both.
 * **Unknown members**: `date_key = -1` and `'unknown'` categories keep measures that would
   otherwise be lost by an inner join.
 * **Two logins, two purposes**: `olist_ingest` writes `raw` only; `olist_dbt` reads `raw`

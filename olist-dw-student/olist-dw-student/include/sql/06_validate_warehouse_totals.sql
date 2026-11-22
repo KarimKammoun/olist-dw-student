@@ -26,11 +26,20 @@ SELECT 'Total Amount',             CAST(SUM(price + freight_value) AS DECIMAL(12
 UNION ALL
 SELECT 'Item Count',               CAST(SUM(item_count) AS DECIMAL(12, 2)),                   '112,650'       FROM marts.fact_sales
 UNION ALL
-SELECT 'Order Count (distinct)',   CAST(COUNT(DISTINCT order_id) AS DECIMAL(12, 2)),          '99,441'        FROM marts.fact_sales
+-- 98,666 and not 99,441: the 775 orders that have NO order line (canceled / unavailable
+-- before any item was added) do not exist in fact_sales. On the source file:
+-- 99,441 orders, 98,666 with at least one item, 775 without. 99,441 is the count of
+-- the ORDERS themselves -> that is [Measures].[Orders Count] in fact_orders (TP8).
+SELECT 'Order Count (distinct, fact_sales)', CAST(COUNT(DISTINCT order_id) AS DECIMAL(12, 2)), '98,666'        FROM marts.fact_sales
 UNION ALL
 SELECT 'Payment Value',            CAST(SUM(payment_value) AS DECIMAL(12, 2)),                '16,008,872.12' FROM marts.fact_payments
 UNION ALL
-SELECT 'Installments',             CAST(SUM(payment_installments) AS DECIMAL(12, 2)),         '104,634'       FROM marts.fact_payments;
+-- 296,423 and not 104,634: the sum of the payment_installments column of the source file
+-- is 296,423 (103,886 payments, max 24 installments). 104,634 is NOT a sum of that column:
+-- it is close to the number of payments made in more than one instalment (51,338) x 2,
+-- so it is most likely the number of PAYMENT ROWS counted differently in the course
+-- document. The value to keep is the one the source file gives: 296,423.
+SELECT 'Installments',             CAST(SUM(payment_installments) AS DECIMAL(12, 2)),         '296,423'       FROM marts.fact_payments;
 GO
 
 PRINT '--- 3. Sales Amount per year (expected 49,785.92 / 6,155,806.98 / 7,386,050.80) ---';
@@ -80,4 +89,21 @@ JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0, 1)
 WHERE s.name = 'marts'
 GROUP BY s.name, t.name
 ORDER BY t.name;
+GO
+
+PRINT '--- 8. checks that settle the two numbers of the course documents ------';
+-- a) orders with no order line: explain why COUNT(DISTINCT order_id) on fact_sales = 98,666
+SELECT COUNT(DISTINCT order_id) AS orders_in_fact_sales,
+       (SELECT COUNT(*) FROM marts.fact_orders)                       AS orders_in_fact_orders,
+       (SELECT COUNT(*) FROM marts.fact_orders) - COUNT(DISTINCT order_id) AS orders_without_line
+FROM marts.fact_sales;
+GO
+
+-- b) installments: distribution, to compare with the 104,634 of the course
+SELECT COUNT(*)                                            AS payments,
+       SUM(payment_installments)                           AS sum_installments,
+       SUM(CASE WHEN payment_installments > 1 THEN 1 ELSE 0 END) AS payments_with_installments,
+       AVG(CAST(payment_installments AS DECIMAL(6, 3)))    AS avg_installments,
+       MAX(payment_installments)                           AS max_installments
+FROM marts.fact_payments;
 GO
