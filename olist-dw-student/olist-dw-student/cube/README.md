@@ -82,6 +82,23 @@ Côté SQL, `include/sql/05a_check_ssas_instance.sql` lit la clé de registre
 > Le moteur de base de données reste sur Express : les deux instances cohabitent sans
 > problème (ports différents).
 
+### 0.5 Si l'installation ne laisse aucune trace
+
+| Symptôme | Cause | Solution |
+|---|---|---|
+| `Get-CimInstance Win32_Service -Filter "Name like '%OLAP%'"` ne renvoie **rien** | aucune instance SSAS n'est installée : `setup.exe` n'a pas encore été lancé | reprendre 0.1 → 0.2 |
+| `Test-NetConnection -Port 2383` ⇒ `False` | même cause (2383 est le port SSAS par défaut) | idem |
+| `This version of the installer is no longer supported` | `SQL2022-SSEI-Dev.exe` trop ancien | re-télécharger via <https://go.microsoft.com/fwlink/?LinkID=2214968> |
+| `Final result: Failed` dans `Summary.txt` | l'installation a démarré mais a échoué | ouvrir `Log\Summary.txt`, chercher `Error` ; le code `-2068052110` signifie un nom de compte invalide dans `ASSYSADMINACCOUNTS` |
+| aucune ligne `Analysis Services` dans les fonctionnalités | média **Express** téléchargé au lieu du média **Developer** | reprendre 0.1 (média Developer obligatoire) |
+
+Trois commandes pour savoir où on en est :
+
+```powershell
+Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "*SQL*" | Select-Object Name, Length, LastWriteTime
+Get-ChildItem "C:\Program Files\Microsoft SQL Server" -Directory -ErrorAction SilentlyContinue
+Test-Path "C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\Summary.txt"
+```
 ## 1. Droits du compte de service SSAS sur le DW
 
 Dans SSMS (moteur de base de données, en admin) : exécuter
