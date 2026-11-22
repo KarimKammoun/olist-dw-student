@@ -18,36 +18,78 @@ Nombre de lignes attendues dans `marts` avant de commencer :
 
 ---
 
-## 0. Prérequis matériels
+## 0. Prérequis matériels : installer SSAS
 
-SQL Server **Express n' inclut pas Analysis Services**. Il faut installer l'instance SSAS
-depuis les médias **gratuits** de SQL Server 2022 **Developer** :
+SQL Server **Express n'inclut pas Analysis Services**. Il faut installer une instance SSAS
+depuis les médias **gratuits** de SQL Server 2022 **Developer** (usage non-production).
 
-1. Télécharger l'ISO/installeur « SQL Server 2022 Developer » (gratuit, usage non-production).
-2. Lancer `setup.exe` → **Installation** → **Nouvelle installation autonome de SQL Server**.
-   ⚠️ Ne PAS choisir « Ajouter des fonctionnalités » sur l'instance Express existante :
-   une instance Express ne peut pas recevoir SSAS.
-3. Écran **Type d'installation** : **Ajouter des fonctionnalités à une instance existante** →
-   sélectionner une **nouvelle** instance nommée, par exemple `OLAP` → l'écran
-   **Sélection de fonctionnalités** propose alors **Analysis Services**.
-   Plus simple encore : choisir **Nouvelle instance** et ne cocher QUE
-   **Analysis Services** (décocher Moteur de base de données).
-4. Écran **Configuration d'Analysis Services** :
-   * Mode serveur : **Multidimensionnel et exploration de données** (surtout pas Tabular) ;
-   * Administrateurs : ajouter votre compte Windows (`DESKTOP-xxx\votre_nom`) ;
-   * Ajouter l'utilisateur actuel : **coché**.
-5. Le compte de service reste `NT Service\MSSQLServerOLAPService` (instance par défaut) ou
-   `NT Service\MSSQLServerOLAPService$OLAP` (instance nommée `OLAP`).
-6. Vérifier : `services.msc` → *SQL Server Analysis Services* → **En cours d'exécution**.
+### 0.1 Téléchargements
+
+| Quoi | Lien / commande |
+|---|---|
+| Installateur SQL Server 2022 Developer | <https://go.microsoft.com/fwlink/?LinkID=2214968> (redirige vers `SQL2022-SSEI-Dev.exe`) |
+| Page officielle (si le lien change) | <https://www.microsoft.com/sql-server/sql-server-downloads> → section *SQL Server 2022* → **Developer** |
+| Visual Studio 2022 Community | <https://visualstudio.microsoft.com/downloads/> (charge de travail *Stockage et traitement des données*) |
+| Extension *Analysis Services Projects 2022+* | <https://marketplace.visualstudio.com/items?itemName=ProBITools.MicrosoftAnalysisServicesModelingProjects2022> — ou dans VS : *Extensions → Gérer les extensions → En ligne* → « Analysis Services » |
+| OLE DB Driver 18/19 for SQL Server (fournisseur du cube) | `winget install -e --id Microsoft.SQLServer.OLEDBDriver` |
+
+> `SQL2022-SSEI-Dev.exe` est un **téléchargeur** (~5 Mo) : il télécharge ensuite les ~700 Mo
+> du média. Choisir **Download Media → ISO**, puis monter l'ISO (double-clic) ou l'extraire.
+
+### 0.2 Installation silencieuse (recommandée, 1 commande)
+
+Le fichier `cube/ssas_install_config.ini` de ce dépôt décrit exactement l'instance voulue :
+**Analysis Services seul**, **instance par défaut**, mode **Multidimensionnel**, compte de
+service `NT Service\MSSQLServerOLAPService`.
+
+1. Ouvrir `cube\ssas_install_config.ini` et remplacer `PC-NAME\user` par votre compte :
+   ```powershell
+   whoami
+   ```
+2. PowerShell **en administrateur**, dans le dossier qui contient `setup.exe` :
+   ```powershell
+   .\setup.exe /ConfigurationFile="C:\dev\ssas_install_config.ini" /IACCEPTSQLSERVERLICENSETERMS /QUIET
+   ```
+3. Suivre l'avancement : `C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\Summary.txt`
+   (dernière ligne : `Final result: Passed`).
+
+### 0.3 Installation avec l'assistant (si vous préférez les écrans)
+
+`setup.exe` → **Installation** → **Nouvelle installation autonome de SQL Server 2022** :
+
+| Écran | Choix |
+|---|---|
+| Type d'installation | **Nouvelle instance** (jamais « ajouter des fonctionnalités » à Express) |
+| Sélection de fonctionnalités | **Analysis Services** seule (décocher « Moteur de base de données ») |
+| Configuration d'Analysis Services | Mode **Multidimensionnel et exploration de données** ; ajouter l'utilisateur actuel comme administrateur |
+| Compte de service | `NT Service\MSSQLServerOLAPService` |
+| Collation | valeur par défaut |
+
+> Instance nommée au lieu de l'instance par défaut ? Le service s'appelle alors
+> `MSSQLServerOLAPService$NOM` : il faut adapter le nom dans
+> `include/sql/05_ssas_service_access.sql` (commentaire en fin de fichier).
+
+### 0.4 Vérifier
+
+```powershell
+Get-CimInstance Win32_Service -Filter "Name like '%OLAP%'" | Select-Object Name, State, StartName
+```
+Attendu : `MSSQLServerOLAPService` · `Running` · `NT SERVICE\MSSQLServerOLAPService`.
+
+Côté SQL, `include/sql/05a_check_ssas_instance.sql` lit la clé de registre
+`Instance Names\OLAP` : si l'instance est installée, elle apparaît avec son nom.
 
 > Le moteur de base de données reste sur Express : les deux instances cohabitent sans
-> problème, elles n'utilisent pas le même port.
+> problème (ports différents).
 
 ## 1. Droits du compte de service SSAS sur le DW
 
 Dans SSMS (moteur de base de données, en admin) : exécuter
 `include/sql/05_ssas_service_access.sql`. Il crée le login Windows du service et lui donne
 `SELECT` sur le schéma `marts`.
+
+Le script est ré-exécutable (`IF NOT EXISTS`) et se termine par un contrôle : la dernière
+sortie doit afficher `NT Service\MSSQLServerOLAPService | WINDOWS_LOGIN | CONNECT, SELECT`.
 
 Contrôle (PowerShell admin) pour connaître le nom exact du compte :
 
@@ -241,5 +283,7 @@ Requêtes : `mdx/business_questions.mdx` (SSAS). Contrôle SQL équivalent :
 |---|---|
 | `mdx/calculated_members.mdx` | membres calculés + jeux nommés à coller dans l'onglet **Calculations** |
 | `mdx/business_questions.mdx` | 14 requêtes MDX à exécuter dans SSMS et à comparer aux valeurs de référence |
+| `ssas_install_config.ini` | fichier de configuration pour installer l'instance SSAS sans assistant (`setup.exe /ConfigurationFile=...`) |
+| `../include/sql/05a_check_ssas_instance.sql` | vérifie qu'une instance SSAS est installée (clé de registre `Instance Names\OLAP`) |
 | `../include/sql/05_ssas_service_access.sql` | droits `SELECT` du compte de service SSAS sur `marts` |
 | `../include/sql/06_validate_warehouse_totals.sql` | les mêmes chiffres vérifiés **en SQL** sur `marts`, avant d'ouvrir le cube |
