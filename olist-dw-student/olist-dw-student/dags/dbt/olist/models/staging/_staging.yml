@@ -8,4 +8,83 @@ models:
         data_tests: [not_null, unique]
       - name: purchased_at
         data_tests: [not_null]
-# TODO TP3: add your staging models and their tests here
+      - name: order_status
+        data_tests: [not_null]
+
+  - name: stg_order_items
+    description: One row per order line (112,650 rows), typed from the Parquet file.
+    columns:
+      - name: order_id
+        data_tests: [not_null]
+      - name: order_item_id
+        data_tests: [not_null]
+      - name: product_id
+        data_tests: [not_null]
+      - name: seller_id
+        data_tests: [not_null]
+      - name: price
+        data_tests: [not_null]
+
+  - name: stg_payments
+    description: One row per payment (103,886 rows), flattened from the JSON document.
+    columns:
+      - name: order_id
+        data_tests: [not_null]
+      - name: payment_sequential
+        data_tests: [not_null]
+      - name: payment_value
+        data_tests: [not_null]
+      - name: payment_type
+        data_tests:
+          - accepted_values:
+              values: ['credit_card', 'boleto', 'voucher', 'debit_card', 'not_defined']
+
+  - name: stg_reviews
+    description: >
+      One row per review (99,224 rows). review_id repeats 814 times in the source,
+      so the unique test is on (review_id, order_id), never on review_id alone.
+    columns:
+      - name: review_id
+        data_tests: [not_null]
+      - name: order_id
+        data_tests: [not_null]
+      - name: review_score
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['review_id', 'order_id']
+
+  - name: stg_customers
+    description: One row per customer (99,441 rows). zip_code_prefix padded back to 5 characters.
+    columns:
+      - name: customer_id
+        data_tests: [not_null, unique]
+      - name: zip_code_prefix
+        data_tests: [not_null]
+
+  - name: stg_products
+    description: One row per product (32,951 rows). Kaggle typos fixed, empty category becomes NULL.
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+
+  - name: stg_sellers
+    description: One row per seller (3,095 rows).
+    columns:
+      - name: seller_id
+        data_tests: [not_null, unique]
+
+  - name: stg_geolocation
+    description: One row per zip prefix (19,015 rows), averaged from 1,000,163 source rows.
+    columns:
+      - name: zip_code_prefix
+        data_tests: [not_null, unique]
+
+  - name: stg_category_translation
+    description: One row per category (71 rows).
+    columns:
+      - name: category_name
+        data_tests: [not_null, unique]

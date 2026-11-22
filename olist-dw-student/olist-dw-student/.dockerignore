@@ -1,0 +1,20 @@
+# Files that must NOT be sent to Docker at build time.
+# Without this file, a .venv / target / .git directory inside dags/ is copied into the
+# image AND hashed by Cosmos on every DAG parse (that is what caused
+# "DagBag import timeout for dags/dbt_olist.py").
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+dags/dbt/olist/target
+dags/dbt/olist/logs
+dags/dbt/olist/dbt_packages
+dags/dbt/olist/.user.yml
+.astro
+.git
+.idea
+.vscode
+tests
+*.log

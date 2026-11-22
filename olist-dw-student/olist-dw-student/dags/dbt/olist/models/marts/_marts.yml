@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  # ---------------------------------------------------------------- dimensions
+  - name: dim_date
+    description: One row per calendar day (2016-2019) plus an "unknown" member (-1).
+    columns:
+      - name: date_key
+        data_tests: [not_null, unique]
+
+  - name: dim_customers
+    description: One row per customer_id (99,441), with the geolocation of the zip prefix.
+    columns:
+      - name: customer_key
+        data_tests: [not_null, unique]
+      - name: customer_id
+        data_tests: [not_null, unique]
+
+  - name: dim_products
+    description: One row per product (32,951), with the English category name.
+    columns:
+      - name: product_key
+        data_tests: [not_null, unique]
+      - name: product_id
+        data_tests: [not_null, unique]
+
+  - name: dim_sellers
+    description: One row per seller (3,095).
+    columns:
+      - name: seller_key
+        data_tests: [not_null, unique]
+      - name: seller_id
+        data_tests: [not_null, unique]
+
+  - name: dim_payment_type
+    description: One row per payment type (5).
+    columns:
+      - name: payment_type_key
+        data_tests: [not_null, unique]
+
+  - name: dim_order_status
+    description: One row per order status (8).
+    columns:
+      - name: order_status_key
+        data_tests: [not_null, unique]
+
+  # --------------------------------------------------------------------- facts
+  - name: fact_sales
+    description: Grain = one order line (112,650 rows). Sales Amount = 13,591,643.70.
+    columns:
+      - name: order_id
+        data_tests: [not_null]
+      - name: date_key
+        data_tests: [not_null]
+      - name: price
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['order_id', 'order_item_id']
+      - dbt_utils.expression_is_true:
+          expression: "price >= 0"
+      - dbt_utils.expression_is_true:
+          expression: "freight_value >= 0"
+
+  - name: fact_payments
+    description: Grain = one payment (103,886 rows). Payment Value = 16,008,872.12.
+    columns:
+      - name: order_id
+        data_tests: [not_null]
+      - name: payment_value
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['order_id', 'payment_sequential']
+
+  - name: fact_orders
+    description: >
+      Grain = one order (99,441 rows). Late orders = 6,534 of 96,478 delivered (6.77%).
+      Four date keys: the cube relates it to dim_date four times.
+    columns:
+      - name: order_id
+        data_tests: [not_null, unique]
+      - name: purchase_date_key
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.expression_is_true:
+          expression: "is_late in (0, 1)"

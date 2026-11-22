@@ -1,0 +1,112 @@
+-- =====================================================================================
+-- Olist Sales - calculated members and KPIs (SSAS Multidimensional, MDX script)
+-- TP8. Paste this block in the CUBE DESIGNER -> Calculations tab (script view),
+-- then Deploy. The cube must have been built first (see cube/README.md).
+--
+-- Measures referenced here (create them as measure groups BEFORE pasting):
+--   Sales        (fact_sales)    : Sales Amount, Freight Amount, Total Amount, Item Count,
+--                                  Order Count
+--   Payments     (fact_payments) : Payment Value, Installments
+--   Orders       (fact_orders)   : Orders Count, Late Orders, Delivery Days, Review Score Sum
+--
+-- Nothing here changes the numbers: they only add derived KPIs and named sets.
+-- =====================================================================================
+
+CALCULATE;
+
+-- --------------------------------------------------------------------------- basic KPIs
+-- Business-friendly aliases of the raw measures.
+CREATE MEMBER CURRENTCUBE.[Measures].[Average Order Value]
+ AS IIF([Measures].[Order Count] = 0, NULL,
+        [Measures].[Sales Amount] / [Measures].[Order Count]),
+ FORMAT_STRING = "Currency", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Average Item Price]
+ AS IIF([Measures].[Item Count] = 0, NULL,
+        [Measures].[Sales Amount] / [Measures].[Item Count]),
+ FORMAT_STRING = "Currency", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Freight Percentage]
+ AS IIF([Measures].[Sales Amount] = 0, NULL,
+        100 * [Measures].[Freight Amount] / [Measures].[Sales Amount]),
+ FORMAT_STRING = "0.00", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Average Freight per Item]
+ AS IIF([Measures].[Item Count] = 0, NULL,
+        [Measures].[Freight Amount] / [Measures].[Item Count]),
+ FORMAT_STRING = "Currency", VISIBLE = 1;
+
+-- ------------------------------------------------------------------- delivery performance
+-- Late Rate = Late Orders / Delivered Orders. It must be computed on the DELIVERED orders
+-- only: the total of Orders Count includes canceled / unavailable / not shipped orders,
+-- which would dilute the rate (that is how you get 0.79% instead of 6.77%).
+CREATE MEMBER CURRENTCUBE.[Measures].[Delivered Orders]
+ AS ([Measures].[Orders Count], [Order Status].[Order Status].[Delivered]),
+ FORMAT_STRING = "#,#", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Late Orders Delivered]
+ AS ([Measures].[Late Orders], [Order Status].[Order Status].[Delivered]),
+ FORMAT_STRING = "#,#", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Late Rate]
+ AS IIF([Measures].[Delivered Orders] = 0, NULL,
+        100.0 * [Measures].[Late Orders Delivered] / [Measures].[Delivered Orders]),
+ FORMAT_STRING = "0.00\%", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Late Rate Of All Orders]
+ AS IIF([Measures].[Orders Count] = 0, NULL,
+        100.0 * [Measures].[Late Orders] / [Measures].[Orders Count]),
+ FORMAT_STRING = "0.00\%", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Average Delivery Days]
+ AS IIF([Measures].[Orders Count] = 0, NULL,
+        [Measures].[Delivery Days] / [Measures].[Orders Count]),
+ FORMAT_STRING = "0.0", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Average Review Score]
+ AS IIF([Measures].[Orders Count] = 0, NULL,
+        [Measures].[Review Score Sum] / [Measures].[Orders Count]),
+ FORMAT_STRING = "0.00", VISIBLE = 1;
+
+-- ------------------------------------------------------------------------------- payments
+CREATE MEMBER CURRENTCUBE.[Measures].[Average Payment Value]
+ AS IIF([Measures].[Order Count] = 0, NULL,
+        [Measures].[Payment Value] / [Measures].[Order Count]),
+ FORMAT_STRING = "Currency", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Average Installments]
+ AS IIF([Measures].[Order Count] = 0, NULL,
+        [Measures].[Installments] / [Measures].[Order Count]),
+ FORMAT_STRING = "0.00", VISIBLE = 1;
+
+-- ---------------------------------------------------------------------------- time series
+-- Same measures computed on the previous period of the same level.
+CREATE MEMBER CURRENTCUBE.[Measures].[Sales Amount Previous Year]
+ AS ([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)),
+ FORMAT_STRING = "Currency", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Sales Year over Year Growth]
+ AS IIF(([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)) = 0, NULL,
+        ([Measures].[Sales Amount] - ([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)))
+        / ([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1))),
+ FORMAT_STRING = "0.00%", VISIBLE = 1;
+
+CREATE MEMBER CURRENTCUBE.[Measures].[Sales Amount Year To Date]
+ AS SUM(YTD([Date].[Calendar].CURRENTMEMBER), [Measures].[Sales Amount]),
+ FORMAT_STRING = "Currency", VISIBLE = 1;
+
+-- --------------------------------------------------------------------------- named sets
+-- Convenient lists for Excel / SSMS.
+CREATE SET CURRENTCUBE.[Top 10 Categories]
+ AS TOPCOUNT([Product].[Category].[Category].MEMBERS, 10, [Measures].[Sales Amount]);
+
+CREATE SET CURRENTCUBE.[Top 10 Sellers]
+ AS TOPCOUNT([Seller].[Seller].[Seller].MEMBERS, 10, [Measures].[Sales Amount]);
+
+CREATE SET CURRENTCUBE.[States]
+ AS NONEMPTY([Customer].[State].[State].MEMBERS, [Measures].[Sales Amount]);
+
+CREATE SET CURRENTCUBE.[Years 2016-2018]
+ AS { [Date].[Calendar].[Calendar Year].&[2016],
+      [Date].[Calendar].[Calendar Year].&[2017],
+      [Date].[Calendar].[Calendar Year].&[2018] };

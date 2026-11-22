@@ -1,0 +1,80 @@
+-- =====================================================================================
+-- Olist Sales - business questions in MDX (SSMS -> Connect to Analysis Services)
+-- TP8. Run each query, compare the result with the "Expected" line.
+-- The five reference numbers come from cube/README.md.
+-- =====================================================================================
+
+-- ---------------------------------------------------------------- Q1. total sales amount
+-- Expected: 13,591,643.70
+SELECT [Measures].[Sales Amount] ON COLUMNS
+FROM   [Olist Sales];
+
+-- ------------------------------------------------------- Q2. sales amount per year (CA)
+-- Expected: 2016 = 49,785.92 | 2017 = 6,155,806.98 | 2018 = 7,386,050.80
+SELECT [Measures].[Sales Amount] ON COLUMNS,
+       NON EMPTY [Date].[Calendar].[Calendar Year].MEMBERS ON ROWS
+FROM   [Olist Sales];
+
+-- -------------------------------------------------------------- Q3. item count per year
+-- Expected: 2016 = 370 | 2017 = 50,864 | 2018 = 61,416
+SELECT [Measures].[Item Count] ON COLUMNS,
+       NON EMPTY [Date].[Calendar].[Calendar Year].MEMBERS ON ROWS
+FROM   [Olist Sales];
+
+-- --------------------------------------------------------------------- Q4. payment value
+-- Expected: 16,008,872.12   (all payment types, 'not_defined' included)
+SELECT [Measures].[Payment Value] ON COLUMNS
+FROM   [Olist Sales];
+
+-- ------------------------------------------------------------ Q5. payment value by type
+-- Expected: credit_card 12,511,046.09 | boleto 3,474,132.45 | voucher 216,383.71 ...
+SELECT [Measures].[Payment Value] ON COLUMNS,
+       NON EMPTY [Payment Type].[Payment Type].[Payment Type].MEMBERS ON ROWS
+FROM   [Olist Sales];
+
+-- ----------------------------------------------------------------------- Q6. late rate
+-- Expected: 6.77  (6,534 late orders out of 96,478 delivered orders)
+SELECT [Measures].[Late Rate]            ON COLUMNS,
+       [Measures].[Late Orders Delivered] ON COLUMNS,
+       [Measures].[Delivered Orders]     ON COLUMNS
+FROM   [Olist Sales];
+
+-- ------------------------------------------- Q7. late rate per state (worst 10 states)
+SELECT [Measures].[Late Rate] ON COLUMNS,
+       TOPCOUNT([Customer].[State].[State].MEMBERS, 10, [Measures].[Late Rate]) ON ROWS
+FROM   [Olist Sales]
+WHERE  [Order Status].[Order Status].[Delivered];
+
+-- ------------------------------------------------- Q8. top 10 categories by sales amount
+SELECT [Measures].[Sales Amount] ON COLUMNS,
+       [Top 10 Categories] ON ROWS
+FROM   [Olist Sales];
+
+-- ----------------------------------------------------- Q9. top 10 sellers by sales amount
+SELECT [Measures].[Sales Amount] ON COLUMNS,
+       [Top 10 Sellers] ON ROWS
+FROM   [Olist Sales];
+
+-- ------------------------------------------------- Q10. monthly sales amount over 2017
+SELECT [Measures].[Sales Amount] ON COLUMNS,
+       NON EMPTY [Date].[Calendar].[Month].MEMBERS ON ROWS
+FROM   [Olist Sales]
+WHERE  [Date].[Calendar].[Calendar Year].&[2017];
+
+-- ------------------------------------- Q11. year to date + year over year growth (2018)
+SELECT { [Measures].[Sales Amount],
+         [Measures].[Sales Amount Year To Date],
+         [Measures].[Sales Amount Year over Year Growth] } ON COLUMNS,
+       { [Date].[Calendar].[Month].&[2018]&[1] : [Date].[Calendar].[Month].&[2018]&[12] } ON ROWS
+FROM   [Olist Sales];
+
+-- ------------------------------- Q12. average review score per category (worst 10 first)
+SELECT [Measures].[Average Review Score] ON COLUMNS,
+       BOTTOMCOUNT([Product].[Category].[Category].MEMBERS, 10, [Measures].[Average Review Score]) ON ROWS
+FROM   [Olist Sales];
+
+-- ------------------------------------------ Q13. average delivery days per customer state
+SELECT [Measures].[Average Delivery Days] ON COLUMNS,
+       NON EMPTY [Customer].[State].[State].MEMBERS ON ROWS
+FROM   [Olist Sales]
+WHERE  [Order Status].[Order Status].[Delivered];

@@ -19,8 +19,12 @@ ENV PATH="${PATH}:/opt/mssql-tools18/bin"
 USER astro
 
 # 2. dbt in its own virtualenv, used by Cosmos (DAG dbt_olist) ............. cached
+#    [pyodbc] is REQUIRED since dbt-sqlserver 1.12: pyodbc is no longer a default
+#    dependency, and profiles.yml uses the pyodbc backend. Without it every dbt task
+#    fails with: "The legacy `pyodbc` backend was requested, but the optional
+#    dependency `pyodbc` is not installed."
 RUN python -m venv dbt_venv \
- && dbt_venv/bin/pip install --no-cache-dir "dbt-sqlserver>=1.10,<2.0"
+ && dbt_venv/bin/pip install --no-cache-dir "dbt-sqlserver[pyodbc]>=1.10,<2.0"
 
 # 3. Python packages for Airflow: redone only when requirements.txt changes
 COPY --chown=astro:0 requirements.txt .
