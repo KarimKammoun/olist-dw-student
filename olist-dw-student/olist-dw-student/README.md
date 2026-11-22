@@ -125,9 +125,13 @@ find -> create_table -> truncate_table -> load_to_raw -> check_rows
 
    Expected: `OK snapshotted staging.snap_customers` then `Done. PASS=1 ERROR=0`,
    and `SELECT COUNT(*) FROM staging.snap_customers` = 99,441 rows.
-   To prove the SCD2 behaviour, run `include/sql/04_scd2_demo.sql` (as admin), re-run the
-   block above, and the modified customer now has **two** rows: one closed
-   (`dbt_valid_to` filled) and one open (`dbt_valid_to` NULL).
+   To prove the SCD2 behaviour run, in this order:
+   1. `include/sql/04_scd2_demo.sql`, **block A only** (as admin): it prints the row,
+      updates the city of the first customer (the value toggles `sousse` / `recife`,
+      so the script can be replayed), and prints `rows_updated = 1`;
+   2. the `dbt snapshot` block above;
+   3. `include/sql/04_scd2_demo.sql`, **block B**: the customer now has **two** rows,
+      one closed (`dbt_valid_to` filled) and one open (`dbt_valid_to` NULL).
 6. **TP8 - cube**: `cube/README.md` (install SSAS from the Developer media, service account
    grants in `include/sql/05_ssas_service_access.sql`), then paste
    `cube/mdx/calculated_members.mdx` in the Calculations tab and run
