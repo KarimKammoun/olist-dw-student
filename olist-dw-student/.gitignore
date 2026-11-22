@@ -1,0 +1,21 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+logs/
+airflow_settings.yaml.local
+# data: each student downloads it from Kaggle
+include/data/olist/*.csv
+include/data/olist/*.zip
+# dbt
+dags/dbt/olist/target/
+dags/dbt/olist/dbt_packages/
+dags/dbt/olist/logs/
+dags/dbt/olist/.user.yml
+# SSAS build output
+cube/**/bin/
+cube/**/obj/
+include/data/olist/*.json
+include/data/olist/*.jsonl
+include/data/olist/*.parquet
+include/rejects/*.csv

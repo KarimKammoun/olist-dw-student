@@ -2,7 +2,7 @@
 # so this file controls the order of the layers:
 #   slow steps that rarely change FIRST (built once, then taken from the cache),
 #   project files LAST (they change often, and now only this last, fast step is redone).
-FROM astrocrpublic.azurecr.io/runtime:3.1-24-base
+FROM astrocrpublic.azurecr.io/runtime:3.1-13-base
 
 # 1. Microsoft ODBC Driver 18 (pyodbc, dbt-sqlserver) + sqlcmd ............ cached
 USER root
@@ -19,8 +19,10 @@ ENV PATH="${PATH}:/opt/mssql-tools18/bin"
 USER astro
 
 # 2. dbt in its own virtualenv, used by Cosmos (DAG dbt_olist) ............. cached
+#    [pyodbc] est OBLIGATOIRE depuis dbt-sqlserver 1.12 :
+#    pyodbc n'est plus installé par défaut, or profiles.yml utilise ce backend.
 RUN python -m venv dbt_venv \
- && dbt_venv/bin/pip install --no-cache-dir "dbt-sqlserver>=1.10,<2.0"
+ && dbt_venv/bin/pip install --no-cache-dir "dbt-sqlserver[pyodbc]>=1.10,<2.0"
 
 # 3. Python packages for Airflow: redone only when requirements.txt changes
 COPY --chown=astro:0 requirements.txt .

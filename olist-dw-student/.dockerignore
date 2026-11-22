@@ -1,0 +1,30 @@
+# Files that must NOT be sent to the image build.
+# (dags/ and include/ are mounted into the containers by astro dev start anyway.)
+
+# virtual environments, anywhere in the project (e.g. dags/dbt/olist/.venv from dbt on Windows)
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+
+# secrets, git, logs
+.env
+.git
+logs
+**/logs
+
+# data files (large) and build outputs
+include/data/olist/*.csv
+include/data/olist/*.json
+include/data/olist/*.jsonl
+include/data/olist/*.parquet
+include/data/olist/*.zip
+archive
+**/target
+**/dbt_packages
+
+# documents and course material not needed by Airflow
+cube
+*.zip
+*.pdf
+*.docx
