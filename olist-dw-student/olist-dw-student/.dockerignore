@@ -12,6 +12,7 @@ dags/dbt/olist/target
 dags/dbt/olist/logs
 dags/dbt/olist/dbt_packages
 dags/dbt/olist/.user.yml
+dags/dbt/olist/package-lock.yml
 .astro
 .git
 .idea

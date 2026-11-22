@@ -64,3 +64,20 @@ JOIN marts.dim_payment_type t ON t.payment_type_key = p.payment_type_key
 GROUP BY t.payment_type
 ORDER BY payment_value DESC;
 GO
+
+PRINT '--- 6. SCD2 history (TP7): first customer, should show 2 rows after the demo ---';
+SELECT customer_id, customer_city, customer_state, dbt_valid_from, dbt_valid_to
+FROM staging.snap_customers
+WHERE customer_id = (SELECT TOP 1 customer_id FROM raw.customers ORDER BY customer_id)
+ORDER BY dbt_valid_from;
+GO
+
+PRINT '--- 7. what the SSAS cube reads: the 9 tables of schema marts ----------';
+SELECT s.name AS table_name, SUM(p.rows) AS row_count
+FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0, 1)
+WHERE s.name = 'marts'
+GROUP BY s.name, t.name
+ORDER BY t.name;
+GO

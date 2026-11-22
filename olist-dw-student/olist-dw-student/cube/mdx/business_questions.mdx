@@ -1,11 +1,11 @@
 -- =====================================================================================
--- Olist Sales - business questions in MDX (SSMS -> Connect to Analysis Services)
--- TP8. Run each query, compare the result with the "Expected" line.
--- The five reference numbers come from cube/README.md.
+-- Olist Sales - business questions in MDX
+-- TP8. Run each query in SSMS -> Connect to Analysis Services -> database OlistDW.
+-- Compare the result with the "Expected" line (values from cube/README.md).
 -- =====================================================================================
 
 -- ---------------------------------------------------------------- Q1. total sales amount
--- Expected: 13,591,643.70
+-- Expected: 13,591,643.70   (112,650 order lines)
 SELECT [Measures].[Sales Amount] ON COLUMNS
 FROM   [Olist Sales];
 
@@ -32,18 +32,18 @@ SELECT [Measures].[Payment Value] ON COLUMNS,
        NON EMPTY [Payment Type].[Payment Type].[Payment Type].MEMBERS ON ROWS
 FROM   [Olist Sales];
 
--- ----------------------------------------------------------------------- Q6. late rate
--- Expected: 6.77  (6,534 late orders out of 96,478 delivered orders)
-SELECT [Measures].[Late Rate]            ON COLUMNS,
-       [Measures].[Late Orders Delivered] ON COLUMNS,
-       [Measures].[Delivered Orders]     ON COLUMNS
+-- ------------------------------------------------------------------------- Q6. late rate
+-- Expected: 6.77   (6,534 late orders out of 96,478 delivered orders)
+SELECT { [Measures].[Late Rate],
+         [Measures].[Late Orders Delivered],
+         [Measures].[Delivered Orders] } ON COLUMNS
 FROM   [Olist Sales];
 
 -- ------------------------------------------- Q7. late rate per state (worst 10 states)
+-- The two measures are already filtered on Delivered, no WHERE clause needed.
 SELECT [Measures].[Late Rate] ON COLUMNS,
        TOPCOUNT([Customer].[State].[State].MEMBERS, 10, [Measures].[Late Rate]) ON ROWS
-FROM   [Olist Sales]
-WHERE  [Order Status].[Order Status].[Delivered];
+FROM   [Olist Sales];
 
 -- ------------------------------------------------- Q8. top 10 categories by sales amount
 SELECT [Measures].[Sales Amount] ON COLUMNS,
@@ -61,11 +61,12 @@ SELECT [Measures].[Sales Amount] ON COLUMNS,
 FROM   [Olist Sales]
 WHERE  [Date].[Calendar].[Calendar Year].&[2017];
 
--- ------------------------------------- Q11. year to date + year over year growth (2018)
+-- ------------------------------- Q11. year to date + year over year growth (2017 and 2018)
+-- Growth is NULL for 2016 (no previous year in the calendar), non-zero for 2017 and 2018.
 SELECT { [Measures].[Sales Amount],
          [Measures].[Sales Amount Year To Date],
-         [Measures].[Sales Amount Year over Year Growth] } ON COLUMNS,
-       { [Date].[Calendar].[Month].&[2018]&[1] : [Date].[Calendar].[Month].&[2018]&[12] } ON ROWS
+         [Measures].[Sales Year over Year Growth] } ON COLUMNS,
+       NON EMPTY { [Date].[Calendar].[Month].&[2017]&[1] : [Date].[Calendar].[Month].&[2018]&[12] } ON ROWS
 FROM   [Olist Sales];
 
 -- ------------------------------- Q12. average review score per category (worst 10 first)
@@ -76,5 +77,9 @@ FROM   [Olist Sales];
 -- ------------------------------------------ Q13. average delivery days per customer state
 SELECT [Measures].[Average Delivery Days] ON COLUMNS,
        NON EMPTY [Customer].[State].[State].MEMBERS ON ROWS
-FROM   [Olist Sales]
-WHERE  [Order Status].[Order Status].[Delivered];
+FROM   [Olist Sales];
+
+-- ---------------------- Q14. control: the same numbers straight from the relational tables
+-- (run in SSMS on the DATABASE ENGINE, not on Analysis Services; see include/sql/
+--  06_validate_warehouse_totals.sql). If the cube and these disagree, the problem is the
+--  cube (a missing relationship or a bad measure), not the warehouse.

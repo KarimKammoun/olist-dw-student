@@ -7,6 +7,12 @@ models:
     columns:
       - name: date_key
         data_tests: [not_null, unique]
+      # quarter (1-4) and month (1-12) repeat in every year, so the SSAS Date hierarchy
+      # (TP8) needs the composite keys below: unique inside the whole calendar.
+      - name: quarter_key
+        data_tests: [not_null, unique]
+      - name: month_key
+        data_tests: [not_null, unique]
 
   - name: dim_customers
     description: One row per customer_id (99,441), with the geolocation of the zip prefix.

@@ -3,19 +3,27 @@
 -- TP8. Paste this block in the CUBE DESIGNER -> Calculations tab (script view),
 -- then Deploy. The cube must have been built first (see cube/README.md).
 --
--- Measures referenced here (create them as measure groups BEFORE pasting):
---   Sales        (fact_sales)    : Sales Amount, Freight Amount, Total Amount, Item Count,
---                                  Order Count
---   Payments     (fact_payments) : Payment Value, Installments
---   Orders       (fact_orders)   : Orders Count, Late Orders, Delivery Days, Review Score Sum
+-- Measures referenced here: they MUST have exactly these names in the cube
+-- (Measure Group -> Measure Name in the Cube Structure tab):
+--   Sales    (fact_sales)    : Sales Amount, Freight Amount, Total Amount,
+--                              Item Count, Order Count (distinct count of order_id)
+--   Payments (fact_payments) : Payment Value, Installments
+--   Orders   (fact_orders)   : Orders Count, Late Orders, Delivery Days, Review Score Sum
 --
--- Nothing here changes the numbers: they only add derived KPIs and named sets.
+-- Attributes referenced here MUST exist with these names:
+--   [Date].[Calendar]            Year > Quarter > Month > Day  (key = date_key, name = full_date)
+--   [Order Status].[Order Status] (key = order_status, name = order_status_label)
+--   [Customer].[State] / [Customer].[City] / [Customer].[Customer]
+--   [Product].[Category]          (name = category_name_english)
+--   [Seller].[Seller]             (name = seller_id)
+--   [Payment Type].[Payment Type] (name = payment_type)
+--
+-- Nothing here changes the numbers: these only add derived KPIs and named sets.
 -- =====================================================================================
 
 CALCULATE;
 
 -- --------------------------------------------------------------------------- basic KPIs
--- Business-friendly aliases of the raw measures.
 CREATE MEMBER CURRENTCUBE.[Measures].[Average Order Value]
  AS IIF([Measures].[Order Count] = 0, NULL,
         [Measures].[Sales Amount] / [Measures].[Order Count]),
@@ -37,9 +45,11 @@ CREATE MEMBER CURRENTCUBE.[Measures].[Average Freight per Item]
  FORMAT_STRING = "Currency", VISIBLE = 1;
 
 -- ------------------------------------------------------------------- delivery performance
--- Late Rate = Late Orders / Delivered Orders. It must be computed on the DELIVERED orders
--- only: the total of Orders Count includes canceled / unavailable / not shipped orders,
--- which would dilute the rate (that is how you get 0.79% instead of 6.77%).
+-- Late Rate = Late Orders / DELIVERED Orders. It must be computed on delivered orders only:
+-- Orders Count also contains canceled / unavailable / shipped orders, and mixing them in
+-- gives 0.79% instead of the expected 6.77%.
+-- Inside an MDX expression the measure is reached through its measure group:
+-- [Measures].[Late Orders] belongs to the Orders measure group.
 CREATE MEMBER CURRENTCUBE.[Measures].[Delivered Orders]
  AS ([Measures].[Orders Count], [Order Status].[Order Status].[Delivered]),
  FORMAT_STRING = "#,#", VISIBLE = 1;
@@ -80,14 +90,19 @@ CREATE MEMBER CURRENTCUBE.[Measures].[Average Installments]
  FORMAT_STRING = "0.00", VISIBLE = 1;
 
 -- ---------------------------------------------------------------------------- time series
--- Same measures computed on the previous period of the same level.
+-- Same measure computed on the same period of the previous year.
+-- The assumption is that the Calendar hierarchy is Year > Quarter > Month > Day:
+-- .PARENT.PARENT from a Month lands on the Year, .LAG(1) takes the previous year.
 CREATE MEMBER CURRENTCUBE.[Measures].[Sales Amount Previous Year]
- AS ([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)),
+ AS ([Measures].[Sales Amount],
+     [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)),
  FORMAT_STRING = "Currency", VISIBLE = 1;
 
 CREATE MEMBER CURRENTCUBE.[Measures].[Sales Year over Year Growth]
- AS IIF(([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)) = 0, NULL,
-        ([Measures].[Sales Amount] - ([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)))
+ AS IIF(([Measures].[Sales Amount],
+         [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)) = 0, NULL,
+        ([Measures].[Sales Amount]
+         - ([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1)))
         / ([Measures].[Sales Amount], [Date].[Calendar].CURRENTMEMBER.PARENT.PARENT.LAG(1))),
  FORMAT_STRING = "0.00%", VISIBLE = 1;
 
@@ -96,7 +111,6 @@ CREATE MEMBER CURRENTCUBE.[Measures].[Sales Amount Year To Date]
  FORMAT_STRING = "Currency", VISIBLE = 1;
 
 -- --------------------------------------------------------------------------- named sets
--- Convenient lists for Excel / SSMS.
 CREATE SET CURRENTCUBE.[Top 10 Categories]
  AS TOPCOUNT([Product].[Category].[Category].MEMBERS, 10, [Measures].[Sales Amount]);
 
@@ -106,6 +120,7 @@ CREATE SET CURRENTCUBE.[Top 10 Sellers]
 CREATE SET CURRENTCUBE.[States]
  AS NONEMPTY([Customer].[State].[State].MEMBERS, [Measures].[Sales Amount]);
 
+-- The Calendar Year attribute is built on the `year` column of dim_date, key = 2016.
 CREATE SET CURRENTCUBE.[Years 2016-2018]
  AS { [Date].[Calendar].[Calendar Year].&[2016],
       [Date].[Calendar].[Calendar Year].&[2017],

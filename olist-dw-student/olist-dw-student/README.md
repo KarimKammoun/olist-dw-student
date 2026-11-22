@@ -55,7 +55,7 @@ olist-dw-student/                     <- the Astro project (Dockerfile, dags/, i
 | dimensions (marts) | - | `dim_date`, `dim_customers`, `dim_products`, `dim_sellers`, `dim_payment_type`, `dim_order_status` |
 | facts (marts) | - | `fact_sales`, `fact_payments`, `fact_orders` |
 | SCD2 | - | `snapshots/snap_customers.sql` |
-| cube | `cube/README.md` | `cube/mdx/calculated_members.mdx`, `cube/mdx/business_questions.mdx` |
+| cube | `cube/README.md` | `cube/README.md` (rewritten step by step), `cube/mdx/calculated_members.mdx`, `cube/mdx/business_questions.mdx`, `include/sql/05_ssas_service_access.sql` |
 | validation | - | `include/sql/06_validate_warehouse_totals.sql` |
 | tests / infra | - | `tests/dags/test_dag_integrity.py` (all 9 tables), `.dockerignore`, `.env.example`, `dbt-sqlserver[pyodbc]` in the Dockerfile |
 
@@ -104,9 +104,33 @@ find -> create_table -> truncate_table -> load_to_raw -> check_rows
    | Sales 2016 / 2017 / 2018 | 49,785.92 / 6,155,806.98 / 7,386,050.80 |
    | Late Rate (delivered orders) | 6.77% (6,534 of 96,478) |
 
-5. **TP7 - SCD2**: `include/sql/04_scd2_demo.sql` then
-   `dbt snapshot --select snap_customers` (README, D1 for the Windows commands).
-6. **TP8 - cube**: `cube/README.md`, then paste `cube/mdx/calculated_members.mdx` and run
+5. **TP7 - SCD2**: `dbt snapshot` is **not** run by Cosmos, it is run by hand.
+   The dbt packages must be installed first, and they must **not** land inside the project
+   that Cosmos hashes (a `dbt_packages/` folder there brings back the
+   `DagBag import timeout`), so the snapshot runs in a throw-away copy:
+
+   ```powershell
+   cd C:\dev\olist-dw-student\olist-dw-student\olist-dw-student
+   astro dev bash
+   ```
+   ```bash
+   # inside the container (DBT_USER / DBT_PASSWORD come from .env)
+   rm -rf /tmp/dbtsnap && cp -r /usr/local/airflow/dags/dbt/olist /tmp/dbtsnap
+   cd /tmp/dbtsnap
+   /usr/local/airflow/dbt_venv/bin/dbt deps     --profiles-dir .
+   /usr/local/airflow/dbt_venv/bin/dbt snapshot --profiles-dir . --target docker --select snap_customers
+   cd / && rm -rf /tmp/dbtsnap
+   exit
+   ```
+
+   Expected: `OK snapshotted staging.snap_customers` then `Done. PASS=1 ERROR=0`,
+   and `SELECT COUNT(*) FROM staging.snap_customers` = 99,441 rows.
+   To prove the SCD2 behaviour, run `include/sql/04_scd2_demo.sql` (as admin), re-run the
+   block above, and the modified customer now has **two** rows: one closed
+   (`dbt_valid_to` filled) and one open (`dbt_valid_to` NULL).
+6. **TP8 - cube**: `cube/README.md` (install SSAS from the Developer media, service account
+   grants in `include/sql/05_ssas_service_access.sql`), then paste
+   `cube/mdx/calculated_members.mdx` in the Calculations tab and run
    `cube/mdx/business_questions.mdx`.
 
 ### dbt on Windows (development)
@@ -146,6 +170,9 @@ dbt build --profiles-dir .
   Day-of-week and weekend are computed from the distance to 1900-01-01 (a Monday), so they
   do not depend on `DATEFIRST`.
 * **`fact_orders` has four date keys**, because the cube relates it to `dim_date` four times.
+* **`dim_date` also exposes `quarter_key` (YYYYQ) and `month_key` (YYYYMM)**: the raw `quarter`
+  and `month` numbers repeat every year, so they cannot key a Date hierarchy in SSAS
+  (all four Januaries would collapse into one member).
 * **Unknown members**: `date_key = -1` and `'unknown'` categories keep measures that would
   otherwise be lost by an inner join.
 * **Two logins, two purposes**: `olist_ingest` writes `raw` only; `olist_dbt` reads `raw`
@@ -180,6 +207,12 @@ picked up in about 30 seconds. No restart needed.
 | `connect() got an unexpected keyword argument 'driver'` | something written in the `Extra` of `mssql_raw` | empty the `Extra` field, save, clear the task |
 | `Login failed for user` (18456) / `Cannot open database` (4060) | Windows-only auth, wrong password, missing user, wrong Schema | see the setup guide, parts B1/B3; Schema = `OlistDW` |
 | `These columns of the file are missing in raw.<table>` | the `.sql` does not match the file | fix the `.sql`, then `DROP TABLE raw.<table>` (`IF NOT EXISTS` never alters an existing table) |
-| `Invalid object name 'staging.snap_customers'` | `dbt snapshot` was never run | run it (TP7) |
+| `Invalid object name 'staging.snap_customers'` | `dbt snapshot` was never run | run it (TP7, step 5) |
+| `dbt expects 1 package(s) ... but found only 0` | `dbt_packages/` is not installed | `dbt deps --profiles-dir .` (inside the copy, see TP7) |
+| `Deprecation: MissingArgumentsPropertyInGenericTestDeprecation` | dbt 1.12 prefers `arguments:` in generic tests | warning only, tests still pass |
+| `Login failed for user 'olist_dbt_login'` (18456) after `ALTER LOGIN` | the password in `.env` and in the `mssql_dbt` connection was not updated | update both, `astro dev restart`, `SELECT LOGINPROPERTY('olist_dbt_login','IsLocked')` |
+| `Invalid column name 'is_expired'` | `sys.sql_logins` has no such column | use `LOGINPROPERTY(name, 'IsExpired')` |
+| SSAS: `Login failed for user 'NT SERVICE\MSSQLSERVEROLAPService'` | the service account has no SQL login | `include/sql/05_ssas_service_access.sql` |
+| SSAS: `The 'Date' dimension ... is used in multiple relationships` / ambiguous | `fact_orders` has 4 date keys | create 4 roles in the Dimension Usage tab (`cube/README.md` §6) |
 | Red `tcp_port` task while Windows tests pass | firewall or `Host = localhost` | `Host = host.docker.internal` |
 | Port already in use | another service | `astro config set postgres.port 5433` / `api-server.port 8090` |

@@ -1,0 +1,8 @@
+# Artefacts produced by running dbt (deps / run / snapshot / docs).
+# They must never be committed and never end up inside dags/dbt/olist in the container:
+# Cosmos hashes every file of this folder on each DAG parse ("DagBag import timeout").
+target/
+dbt_packages/
+logs/
+package-lock.yml
+.user.yml

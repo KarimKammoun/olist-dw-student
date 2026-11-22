@@ -3,6 +3,9 @@
 -- The cube relates fact_orders to this dimension FOUR times (purchase, approved,
 -- delivered to carrier, delivered to customer): that is why fact_orders has four date keys.
 -- date_key is an INT in YYYYMMDD form (-1 when the date is missing): readable and fast to join.
+-- quarter_key (YYYYQ) and month_key (YYYYMM) exist for the SSAS cube (TP8): `quarter` (1-4)
+-- and `month` (1-12) repeat in every year, so they cannot be the key of a Date hierarchy
+-- attribute: SSAS would merge all the January rows of 2016-2019 into one member.
 --
 -- The numbers are generated with a small tally table (10 x 10 x 10 x 10 = 10,000) and NOT
 -- with sys.all_objects: a low-privilege login like olist_dbt only sees its own objects
@@ -57,6 +60,8 @@ select
     date_key,
     full_date,
     year,
+    year * 10 + quarter      as quarter_key,
+    year * 100 + month       as month_key,
     quarter,
     month,
     month_name,
@@ -74,6 +79,8 @@ select
     -1                          as date_key,
     cast('1900-01-01' as date)  as full_date,
     0                           as year,
+    0                           as quarter_key,
+    0                           as month_key,
     0                           as quarter,
     0                           as month,
     'Unknown'                   as month_name,
