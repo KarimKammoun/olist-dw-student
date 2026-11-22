@@ -34,7 +34,26 @@ depuis les médias **gratuits** de SQL Server 2022 **Developer** (usage non-prod
 | OLE DB Driver 18/19 for SQL Server (fournisseur du cube) | `winget install -e --id Microsoft.SQLServer.OLEDBDriver` |
 
 > `SQL2022-SSEI-Dev.exe` est un **téléchargeur** (~5 Mo) : il télécharge ensuite les ~700 Mo
-> du média. Choisir **Download Media → ISO**, puis monter l'ISO (double-clic) ou l'extraire.
+> du média. Téléchargement **sans clic** (la fenêtre affiche la progression) :
+>
+> ```powershell
+> cd "$env:USERPROFILE\Downloads"
+> .\SQL2022-SSEI-Dev.exe /ACTION=Download /MEDIATYPE=ISO /MEDIAPATH="C:\dev\sql2022"
+> ```
+>
+> Si le paramètre est refusé : lancer `SQL2022-SSEI-Dev.exe` sans argument → **Download Media**
+> → **ISO** → dossier `C:\dev\sql2022` → **Download**.
+
+### 0.1.1 Cohabitation avec une autre version de SQL Server
+
+L'instance de travail peut être **SQL Server 2025 Express** (`C:\Program Files\Microsoft SQL
+Server\170`, instance `MSSQL17.SQLEXPRESS01`) : cela ne gêne pas. Le programme d'installation
+2022 ajoute **une instance SSAS 2022** à côté, sans toucher au moteur existant. Conséquences :
+
+* dans SSMS, le moteur de base de données se connecte toujours à l'instance existante
+  (`localhost\SQLEXPRESS01` dans ce cas, pas `SQLEXPRESS`) ;
+* `include/sql/05_ssas_service_access.sql` s'exécute **sur ce moteur-là** ;
+* SSMS 2025/2022 se connecte à SSAS via **Analysis Services** → `localhost` (port 2383).
 
 ### 0.2 Installation silencieuse (recommandée, 1 commande)
 
@@ -46,9 +65,16 @@ service `NT Service\MSSQLServerOLAPService`.
    ```powershell
    whoami
    ```
-2. PowerShell **en administrateur**, dans le dossier qui contient `setup.exe` :
+2. PowerShell **en administrateur**, dans le dossier qui contient `setup.exe`.
+   Monter l'ISO et récupérer sa lettre de lecteur en une commande :
    ```powershell
-   .\setup.exe /ConfigurationFile="C:\dev\ssas_install_config.ini" /IACCEPTSQLSERVERLICENSETERMS /QUIET
+   $iso   = Get-ChildItem C:\dev\sql2022 -Filter *.iso | Select-Object -First 1
+   $drive = (Mount-DiskImage -ImagePath $iso.FullName -PassThru | Get-Volume).DriveLetter
+   "ISO montee sur $drive`:"
+   ```
+   Puis lancer l'installation (remplacer `E:` par la lettre affichée) :
+   ```powershell
+   E:\setup.exe /ConfigurationFile="C:\dev\ssas_install_config.ini" /IACCEPTSQLSERVERLICENSETERMS /QUIET
    ```
 3. Suivre l'avancement : `C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\Summary.txt`
    (dernière ligne : `Final result: Passed`).
