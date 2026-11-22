@@ -42,6 +42,8 @@ calendar as (
         cast(convert(char(8), full_date, 112) as int)   as date_key,
         full_date,
         year(full_date)                                 as year,
+        year(full_date) * 10 + datepart(quarter, full_date) as quarter_key,
+        year(full_date) * 100 + month(full_date)        as month_key,
         datepart(quarter, full_date)                    as quarter,
         month(full_date)                                as month,
         datename(month, full_date)                      as month_name,
