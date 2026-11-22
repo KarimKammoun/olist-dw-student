@@ -53,14 +53,21 @@ models:
       - name: date_key
         data_tests: [not_null]
       - name: price
-        data_tests: [not_null]
+        data_tests:
+          - not_null
+          # dbt_utils.expression_is_true cannot be used here: it compiles to
+          # "select 1 from ..." and dbt runs every test as a view, which SQL Server
+          # rejects with "Create View or Function failed because no column name was
+          # specified for column 1" (4511). accepted_range uses "select *" and works.
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: freight_value
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: ['order_id', 'order_item_id']
-      - dbt_utils.expression_is_true:
-          expression: "price >= 0"
-      - dbt_utils.expression_is_true:
-          expression: "freight_value >= 0"
 
   - name: fact_payments
     description: Grain = one payment (103,886 rows). Payment Value = 16,008,872.12.
@@ -82,6 +89,8 @@ models:
         data_tests: [not_null, unique]
       - name: purchase_date_key
         data_tests: [not_null]
-    data_tests:
-      - dbt_utils.expression_is_true:
-          expression: "is_late in (0, 1)"
+      - name: is_late
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
