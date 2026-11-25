@@ -23,6 +23,43 @@ PRINT '--- 0. what exists right now -------------------------------------------'
 SELECT DB_ID('OlistDW') AS olistdw_db_id;   -- NULL = the database does not exist
 GO
 
+SELECT name, state_desc, user_access_desc FROM sys.databases WHERE name = 'OlistDW';
+-- state_desc must be ONLINE. RECOVERY_PENDING / SUSPECT / RECOVERY means the files
+-- are unreadable: the database must be dropped, not repaired (see 0b).
+SELECT name, type_desc, physical_name, size * 8 / 1024 AS size_mb
+FROM sys.master_files WHERE database_id = DB_ID('OlistDW');
+GO
+
+/* ------------------------------------------------------------------ 0b. broken db
+   Symptom: Msg 945 "Database 'OlistDW' cannot be opened due to inaccessible files"
+   and the database shows as (Recovery Pending) in SSMS. Cause: the .mdf / .ldf are
+   unreadable (deleted or moved by hand, disk full, service account without rights).
+   Nothing in the warehouse is worth a REPAIR_ALLOW_DATA_LOSS: it is fully rebuilt
+   from the nine source files, so the fastest and safest fix is DROP + recreate.
+   Run this block ONLY if the state_desc above is not ONLINE.
+
+   If DROP fails with the same Msg 945, use the two variants below it, then delete the
+   leftover files (path shown by the last query above) and run the script again.
+   ---------------------------------------------------------------------------- */
+-- USE master;
+-- GO
+-- ALTER DATABASE OlistDW SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+-- GO
+-- DROP DATABASE OlistDW;
+-- GO
+-- variant 1: ALTER DATABASE OlistDW SET OFFLINE WITH ROLLBACK IMMEDIATE; then DROP DATABASE OlistDW;
+-- variant 2: EXEC sp_detach_db N'OlistDW';   -- then delete the files and CREATE DATABASE
+
+/* The failed run of this script left users in master (USE OlistDW failed, so the
+   following statements ran in master). Clean them up if they are there: */
+-- USE master;
+-- GO
+-- IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'olist_ingest') DROP USER olist_ingest;
+-- IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'olist_dbt')    DROP USER olist_dbt;
+-- GO
+
+-- When the DROP is done, go back to section 1 below and run the script from the top.
+
 /* --------------------------------------------------------- 1. database + schemas */
 USE master;
 GO
