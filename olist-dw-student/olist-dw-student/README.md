@@ -208,7 +208,28 @@ picked up in about 30 seconds. No restart needed.
 
 ---
 
-## 6. Troubleshooting
+## 6. Disaster recovery
+
+Dropped the database by mistake (`DROP DATABASE OlistDW`)? Nothing is really lost: the nine
+source files, the DAGs and the dbt models are in the repository, so the warehouse is just
+rebuilt by the pipeline.
+
+1. `include/sql/03_recreate_warehouse.sql` in SSMS as admin: it recreates the database, the
+   three schemas, the two users and **all the grants** (including the two permissions the
+   SQL Server adapter needs: `SELECT` on `sys.sql_expression_dependencies` and
+   `VIEW DEFINITION`), then prints the next steps.
+2. Trigger the 9 `load_raw_*` DAGs in Airflow -> the 9 `raw` tables are reloaded.
+3. `dbt_olist` starts by itself once the 9 assets are refreshed -> 22 models, 69 tests.
+4. Rebuild the snapshot with the TP7 recipe (`dbt snapshot --select snap_customers`).
+5. `include/sql/06_validate_warehouse_totals.sql` -> the five reference numbers.
+
+The Airflow connections are **not** in SQL Server: `mssql_raw` and `mssql_dbt` are untouched
+by a database drop. They only need to be recreated if the Airflow volume was reset
+(`astro dev kill`).
+
+---
+
+## 7. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|

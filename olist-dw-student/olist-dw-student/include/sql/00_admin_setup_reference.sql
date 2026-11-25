@@ -25,4 +25,11 @@ GRANT SELECT ON SCHEMA::raw TO olist_dbt;
 GRANT CREATE TABLE, CREATE VIEW TO olist_dbt;
 GRANT ALTER, SELECT, INSERT, UPDATE, DELETE ON SCHEMA::staging TO olist_dbt;
 GRANT ALTER, SELECT, INSERT, UPDATE, DELETE ON SCHEMA::marts   TO olist_dbt;
+-- needed by dbt-sqlserver to list the views it has to drop before recreating them:
+GRANT SELECT ON sys.sql_expression_dependencies TO olist_dbt;
+GRANT VIEW DEFINITION ON DATABASE::OlistDW TO olist_dbt;
 */
+
+/* The whole database was dropped? Run include/sql/03_recreate_warehouse.sql
+   instead: it recreates the database, the schemas, the users and these grants in
+   one script, then lists the 4 steps to rebuild the data. */
