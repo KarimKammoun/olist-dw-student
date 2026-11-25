@@ -218,10 +218,14 @@ rebuilt by the pipeline.
    three schemas, the two users and **all the grants** (including the two permissions the
    SQL Server adapter needs: `SELECT` on `sys.sql_expression_dependencies` and
    `VIEW DEFINITION`), then prints the next steps.
-2. Trigger the 9 `load_raw_*` DAGs in Airflow -> the 9 `raw` tables are reloaded.
-3. `dbt_olist` starts by itself once the 9 assets are refreshed -> 22 models, 69 tests.
-4. Rebuild the snapshot with the TP7 recipe (`dbt snapshot --select snap_customers`).
-5. `include/sql/06_validate_warehouse_totals.sql` -> the five reference numbers.
+2. If a connection fails afterwards (`mssql_dbt` in particular), run
+   `include/sql/03a_fix_logins.sql`: it recreates both logins with a known password,
+   enables/unlocks them, recreates the users in `OlistDW` and restores the grants.
+   Then keep `.env` and the two Airflow connections in sync with those passwords.
+3. Trigger the 9 `load_raw_*` DAGs in Airflow -> the 9 `raw` tables are reloaded.
+4. `dbt_olist` starts by itself once the 9 assets are refreshed -> 22 models, 69 tests.
+5. Rebuild the snapshot with the TP7 recipe (`dbt snapshot --select snap_customers`).
+6. `include/sql/06_validate_warehouse_totals.sql` -> the five reference numbers.
 
 The Airflow connections are **not** in SQL Server: `mssql_raw` and `mssql_dbt` are untouched
 by a database drop. They only need to be recreated if the Airflow volume was reset
@@ -242,6 +246,7 @@ by a database drop. They only need to be recreated if the Airflow volume was res
 | `dbt expects 1 package(s) ... but found only 0` | `dbt_packages/` is not installed | `dbt deps --profiles-dir .` (inside the copy, see TP7) |
 | `Deprecation: MissingArgumentsPropertyInGenericTestDeprecation` | dbt 1.12 prefers `arguments:` in generic tests | warning only, tests still pass |
 | `Login failed for user 'olist_dbt_login'` (18456) after `ALTER LOGIN` | the password in `.env` and in the `mssql_dbt` connection was not updated | update both, `astro dev restart`, `SELECT LOGINPROPERTY('olist_dbt_login','IsLocked')` |
+| `mssql_raw` OK but `mssql_dbt` fails | the two logins are independent: `olist_dbt_login` can be missing, disabled, locked or have another password | run `include/sql/03a_fix_logins.sql` (in `master`), then update the `mssql_dbt` password and `.env` to `OlistDbt2026!` |
 | `Invalid column name 'is_expired'` | `sys.sql_logins` has no such column | use `LOGINPROPERTY(name, 'IsExpired')` |
 | SSAS: `Login failed for user 'NT SERVICE\MSSQLSERVEROLAPService'` | the service account has no SQL login | `include/sql/05_ssas_service_access.sql` |
 | SSAS: `The 'Date' dimension ... is used in multiple relationships` / ambiguous | `fact_orders` has 4 date keys | create 4 roles in the Dimension Usage tab (`cube/README.md` §6) |
