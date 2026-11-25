@@ -243,6 +243,7 @@ by a database drop. They only need to be recreated if the Airflow volume was res
 | `Login failed for user` (18456) / `Cannot open database` (4060) | Windows-only auth, wrong password, missing user, wrong Schema | see the setup guide, parts B1/B3; Schema = `OlistDW` |
 | `These columns of the file are missing in raw.<table>` | the `.sql` does not match the file | fix the `.sql`, then `DROP TABLE raw.<table>` (`IF NOT EXISTS` never alters an existing table) |
 | `Invalid object name 'staging.snap_customers'` | `dbt snapshot` was never run | run it (TP7, step 5) |
+| `Invalid object name 'OlistDW.raw.<table>'` (208) | the database was recreated (or the schema is empty) and the raw tables were never reloaded | trigger the 9 `load_raw_*` DAGs, then `dbt_olist`. For the snapshot alone, `load_raw_customers` is enough |
 | `dbt expects 1 package(s) ... but found only 0` | `dbt_packages/` is not installed | `dbt deps --profiles-dir .` (inside the copy, see TP7) |
 | `Deprecation: MissingArgumentsPropertyInGenericTestDeprecation` | dbt 1.12 prefers `arguments:` in generic tests | warning only, tests still pass |
 | `Login failed for user 'olist_dbt_login'` (18456) after `ALTER LOGIN` | the password in `.env` and in the `mssql_dbt` connection was not updated | update both, `astro dev restart`, `SELECT LOGINPROPERTY('olist_dbt_login','IsLocked')` |
